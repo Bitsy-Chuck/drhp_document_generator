@@ -39,6 +39,11 @@ from drhp_agent.core.dtos.pipeline import (
     StageStatus,
     RunManifest,
 )
+from drhp_agent.core.dtos.elaboration import (
+    ElaborationBlock,
+    ElaborationRequest,
+    ElaborationResult,
+)
 
 __all__ = [
     # Template
@@ -70,4 +75,8 @@ __all__ = [
     "PipelineConfig",
     "StageStatus",
     "RunManifest",
+    # Elaboration
+    "ElaborationBlock",
+    "ElaborationRequest",
+    "ElaborationResult",
 ]

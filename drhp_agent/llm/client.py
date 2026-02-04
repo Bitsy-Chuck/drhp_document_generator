@@ -265,3 +265,38 @@ class LLMClient:
         )
 
         return self.complete(SECTION_GENERATE_SYSTEM_PROMPT, user, max_tokens=8192)
+
+    def elaborate_section(
+        self,
+        block_id: str,
+        hint: str,
+        fact_category: str | None,
+        template_context: str,
+        facts_json: str,
+    ) -> dict[str, Any]:
+        """Generate elaborate prose for a template block.
+
+        Args:
+            block_id: ID of the elaboration block
+            hint: Instructions for what to elaborate on
+            fact_category: Optional category filter for facts
+            template_context: Surrounding template text for tone matching
+            facts_json: JSON string of relevant facts
+
+        Returns:
+            Elaboration result with generated markdown and sources
+        """
+        from drhp_agent.prompts import (
+            ELABORATION_SYSTEM_PROMPT,
+            ELABORATION_USER_PROMPT,
+        )
+
+        user = ELABORATION_USER_PROMPT.format(
+            block_id=block_id,
+            hint=hint or "Generate detailed content",
+            fact_category=fact_category or "all",
+            template_context=template_context or "No context provided",
+            facts_json=facts_json,
+        )
+
+        return self.complete_json(ELABORATION_SYSTEM_PROMPT, user, max_tokens=8192)

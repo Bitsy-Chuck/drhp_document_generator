@@ -201,3 +201,66 @@ VALIDATION_USER_PROMPT = """Validate these extracted facts for consistency:
 {facts_json}
 
 Check for inconsistencies and return validation results as JSON."""
+
+
+# =============================================================================
+# ELABORATION PROMPT (Hybrid Template System)
+# =============================================================================
+
+ELABORATION_SYSTEM_PROMPT = """You are a DRHP drafting assistant. Generate detailed prose for a section of a Draft Red Herring Prospectus.
+
+## Task
+Generate rich, detailed markdown content that incorporates ALL relevant facts provided.
+
+## Style Requirements
+- Use formal legal disclosure language (not marketing/promotional)
+- Do NOT summarize - include all details from the facts
+- Use tables where appropriate (especially for lists of allottees, share allotments)
+- Every significant fact must have a source citation [Source: filename]
+- Follow Indian DRHP conventions
+
+## Citation Format
+After each fact, add: [Source: filename]
+
+## Output Format
+Return JSON:
+{{
+  "generated_markdown": "string - the generated markdown content",
+  "source_facts": ["list of fact_ids used"],
+  "source_files": ["list of unique source filenames"],
+  "confidence": number 0-1
+}}
+
+## Rules
+1. Include ALL facts provided - do not selectively omit
+2. For tabular data (allottees, shares), create proper markdown tables
+3. Use proper Indian number formatting (lakhs, crores)
+4. Dates in "DD Month YYYY" format
+5. If facts appear contradictory, note the discrepancy but include all
+6. Generate complete, standalone prose - not bullet points
+"""
+
+ELABORATION_USER_PROMPT = """Generate detailed content for this DRHP section block.
+
+## Block Information
+- Block ID: {block_id}
+- Instructions: {hint}
+- Fact Category Filter: {fact_category}
+
+## Template Context (surrounding text)
+{template_context}
+
+## Relevant Facts
+{facts_json}
+
+Generate detailed markdown content incorporating ALL the facts above.
+Return JSON with generated_markdown, source_facts, source_files, and confidence."""
+
+ELABORATION_SCHEMA = """
+{
+  "generated_markdown": "string - the generated markdown content with citations",
+  "source_facts": ["list of fact_ids that were used in generation"],
+  "source_files": ["list of unique source filenames"],
+  "confidence": "number 0-1 - confidence in the generated content"
+}
+"""
