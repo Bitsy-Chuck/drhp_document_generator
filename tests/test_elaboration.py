@@ -14,7 +14,7 @@ from drhp_agent.core.dtos import (
     ExtractedFact,
     FactLocation,
 )
-from drhp_agent.elaborate.elaborator import Elaborator, Elaborations, FactFilter
+from drhp_agent.elaborate.elaborator import Elaborator, Elaborations
 from drhp_agent.md_template.parser import TemplateParser, ParsedTemplate
 
 
@@ -25,20 +25,17 @@ class TestElaborationDTOs:
         block = ElaborationBlock(
             block_id="allotment_history",
             hint="Generate a table of all allotments",
-            fact_category="allotment",
-            raw_marker="{{elaborate:allotment_history:allotment:Generate a table of all allotments}}",
+            raw_marker="{{elaborate:allotment_history:Generate a table of all allotments}}",
             line_number=10,
             context="## History of Equity Share Capital",
         )
         assert block.block_id == "allotment_history"
         assert block.hint == "Generate a table of all allotments"
-        assert block.fact_category == "allotment"
 
     def test_elaboration_request_creation(self):
         request = ElaborationRequest(
             block_id="test_block",
             hint="Generate content",
-            fact_category="capital_structure",
             relevant_facts=[{"fact_id": "F001", "value": "100"}],
             template_context="Some context",
         )
@@ -64,9 +61,9 @@ class TestElaborationDTOs:
 class TestTemplateParserElaboration:
     """Tests for template parser elaboration block detection (Task 13.2)."""
 
-    def test_parse_elaborate_block_full_format(self, tmp_path):
-        """Full format: {{elaborate:block_id:category:hint}}"""
-        content = "{{elaborate:allotment_history:allotment:Generate all allotments}}"
+    def test_parse_elaborate_block_with_hint(self, tmp_path):
+        """Format: {{elaborate:block_id:hint}}"""
+        content = "{{elaborate:allotment_history:Generate all allotments}}"
         path = tmp_path / "template.md"
         path.write_text(content)
 
@@ -76,12 +73,11 @@ class TestTemplateParserElaboration:
         assert len(result.elaboration_blocks) == 1
         block = result.elaboration_blocks[0]
         assert block.block_id == "allotment_history"
-        assert block.fact_category == "allotment"
         assert block.hint == "Generate all allotments"
 
-    def test_parse_elaborate_block_short_format(self, tmp_path):
-        """Short format: {{elaborate:block_id:hint}}"""
-        content = "{{elaborate:summary:Generate a summary}}"
+    def test_parse_elaborate_block_no_hint(self, tmp_path):
+        """Format: {{elaborate:block_id}}"""
+        content = "{{elaborate:summary}}"
         path = tmp_path / "template.md"
         path.write_text(content)
 
@@ -91,8 +87,7 @@ class TestTemplateParserElaboration:
         assert len(result.elaboration_blocks) == 1
         block = result.elaboration_blocks[0]
         assert block.block_id == "summary"
-        assert block.fact_category is None
-        assert block.hint == "Generate a summary"
+        assert block.hint == ""
 
     def test_parse_mixed_slots_and_elaborations(self, tmp_path):
         """Template with both slots and elaboration blocks."""
@@ -100,7 +95,7 @@ class TestTemplateParserElaboration:
 
 Company: {{text:company_name:Company name}}
 
-{{elaborate:allotment_history:allotment:Generate allotment table}}
+{{elaborate:allotment_history:Generate allotment table}}
 
 Total shares: {{integer:total_shares:Total shares}}
 """
@@ -115,7 +110,7 @@ Total shares: {{integer:total_shares:Total shares}}
 
     def test_to_elaboration_requests(self, tmp_path):
         """Test conversion to elaboration requests."""
-        content = "{{elaborate:test_block:category:Test hint}}"
+        content = "{{elaborate:test_block:Test hint}}"
         path = tmp_path / "template.md"
         path.write_text(content)
 
@@ -128,18 +123,17 @@ Total shares: {{integer:total_shares:Total shares}}
         assert requests[0].block_id == "test_block"
         assert requests[0].relevant_facts == []
 
-        # With facts - should filter by category
+        # With facts - all should be passed (no filtering)
         facts = [
-            {"fact_id": "F001", "category": "category", "value": "v1"},
-            {"fact_id": "F002", "category": "other", "value": "v2"},
+            {"fact_id": "F001", "key": "allotment", "value": "v1"},
+            {"fact_id": "F002", "key": "other", "value": "v2"},
         ]
         requests = result.to_elaboration_requests(facts)
-        assert len(requests[0].relevant_facts) == 1
-        assert requests[0].relevant_facts[0]["fact_id"] == "F001"
+        assert len(requests[0].relevant_facts) == 2  # All facts passed
 
     def test_to_dict_includes_elaboration_blocks(self, tmp_path):
         """Test that to_dict includes elaboration blocks."""
-        content = "{{elaborate:block1:hint1}}\n{{elaborate:block2:cat:hint2}}"
+        content = "{{elaborate:block1:hint1}}\n{{elaborate:block2:hint2}}"
         path = tmp_path / "template.md"
         path.write_text(content)
 
@@ -152,7 +146,7 @@ Total shares: {{integer:total_shares:Total shares}}
 
     def test_parse_preserves_elaborate_raw_marker(self, tmp_path):
         """Raw marker should be preserved exactly."""
-        content = "{{elaborate:test:cat:Generate content with details}}"
+        content = "{{elaborate:test:Generate content with details}}"
         path = tmp_path / "template.md"
         path.write_text(content)
 
@@ -160,45 +154,6 @@ Total shares: {{integer:total_shares:Total shares}}
         result = parser.parse()
 
         assert result.elaboration_blocks[0].raw_marker == content
-
-
-class TestFactFilter:
-    """Tests for FactFilter (Task 13.4.2)."""
-
-    def test_filter_by_category(self):
-        facts = [
-            {"fact_id": "F001", "category": "allotment", "value": "100"},
-            {"fact_id": "F002", "category": "capital", "value": "200"},
-            {"fact_id": "F003", "category": "allotment", "value": "300"},
-        ]
-
-        filtered = FactFilter.filter_by_category(facts, "allotment")
-        assert len(filtered) == 2
-        assert all(f["category"] == "allotment" for f in filtered)
-
-    def test_filter_by_category_none_returns_all(self):
-        facts = [
-            {"fact_id": "F001", "category": "a"},
-            {"fact_id": "F002", "category": "b"},
-        ]
-
-        filtered = FactFilter.filter_by_category(facts, None)
-        assert len(filtered) == 2
-
-    def test_filter_by_keywords(self):
-        facts = [
-            {"fact_id": "F001", "key": "allotment_date", "raw_text": "Dated 15 May"},
-            {"fact_id": "F002", "key": "company_name", "raw_text": "Test Corp"},
-            {"fact_id": "F003", "key": "shares_allotted", "raw_text": "960 shares allotted"},
-        ]
-
-        filtered = FactFilter.filter_by_keywords(facts, ["allot"])
-        assert len(filtered) == 2  # F001 and F003 contain "allot"
-
-    def test_filter_by_keywords_empty_returns_all(self):
-        facts = [{"fact_id": "F001"}, {"fact_id": "F002"}]
-        filtered = FactFilter.filter_by_keywords(facts, [])
-        assert len(filtered) == 2
 
 
 class TestElaborations:
@@ -266,7 +221,6 @@ class TestElaborator:
         facts = [
             ExtractedFact(
                 fact_id="F001",
-                category="allotment",
                 key="allotment_date",
                 value="2019-05-15",
                 value_type="date",
@@ -276,7 +230,6 @@ class TestElaborator:
             ),
             ExtractedFact(
                 fact_id="F002",
-                category="allotment",
                 key="shares_allotted",
                 value=960,
                 value_type="integer",
@@ -298,7 +251,6 @@ class TestElaborator:
         request = ElaborationRequest(
             block_id="test_block",
             hint="Generate content",
-            fact_category="allotment",
         )
 
         result = elaborator.elaborate(request, sample_fact_store)
@@ -314,7 +266,6 @@ class TestElaborator:
         request = ElaborationRequest(
             block_id="test_block",
             hint="Generate content",
-            fact_category="allotment",
         )
 
         result = elaborator.elaborate(request, empty_store)

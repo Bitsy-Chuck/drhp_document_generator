@@ -117,7 +117,6 @@ class TestPipelineOrchestrator:
                 "facts": [
                     {
                         "fact_id": "F001",
-                        "category": "company_info",
                         "key": "company_name",
                         "value": "Test Corp",
                         "value_type": "text",

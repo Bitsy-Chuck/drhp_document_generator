@@ -6,6 +6,7 @@ Task 1.6, 9.1-9.4: Single command execution with progress and exit codes.
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -119,6 +120,13 @@ def main(args: list[str] | None = None) -> int:
         help="Suppress progress output",
     )
 
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging level (default: INFO)",
+    )
+
     parsed = parser.parse_args(args)
 
     # Validate paths
@@ -139,6 +147,27 @@ def main(args: list[str] | None = None) -> int:
         supporting_docs=str(evidence_path),
         out_dir=str(parsed.out),
     )
+
+    # Setup logging
+    out_dir = Path(parsed.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    log_level = getattr(logging, parsed.log_level)
+    log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+
+    file_handler = logging.FileHandler(out_dir / "pipeline.log", mode="w")
+    file_handler.setLevel(log_level)
+    file_handler.setFormatter(logging.Formatter(log_format))
+    root_logger.addHandler(file_handler)
+
+    if log_level == logging.DEBUG:
+        stderr_handler = logging.StreamHandler(sys.stderr)
+        stderr_handler.setLevel(logging.DEBUG)
+        stderr_handler.setFormatter(logging.Formatter(log_format))
+        root_logger.addHandler(stderr_handler)
 
     # Progress callback
     progress_callback = None if parsed.quiet else print_progress

@@ -6,9 +6,12 @@ Tasks 7.1-7.7: Validate facts for consistency across documents.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from drhp_agent.core.dtos import FactStore, ValidationIssue
 from drhp_agent.core.enums import EnumValidationSeverity
@@ -109,12 +112,23 @@ class FactValidator:
                     )
                 )
 
-            return ValidationResult(
+            validation_result = ValidationResult(
                 is_valid=result.get("is_valid", len(issues) == 0),
                 issues=issues,
             )
+            logger.info("Validation: valid=%s issues=%d (critical=%d error=%d warn=%d info=%d)",
+                        validation_result.is_valid, len(issues),
+                        validation_result.critical_count, validation_result.error_count,
+                        validation_result.warn_count, validation_result.info_count)
+            for issue in issues:
+                if issue.severity in (EnumValidationSeverity.CRITICAL, EnumValidationSeverity.ERROR):
+                    logger.error("Issue %s [%s]: %s", issue.issue_id, issue.severity.value, issue.message)
+                else:
+                    logger.warning("Issue %s [%s]: %s", issue.issue_id, issue.severity.value, issue.message)
+            return validation_result
 
         except Exception as e:
+            logger.error("Validation failed: %s", e)
             return ValidationResult(
                 is_valid=False,
                 issues=[
@@ -148,7 +162,6 @@ class FactValidator:
         for fact in fact_store.all_facts():
             facts.append({
                 "fact_id": fact.fact_id,
-                "category": fact.category,
                 "key": fact.key,
                 "value": fact.value,
                 "value_type": fact.value_type,

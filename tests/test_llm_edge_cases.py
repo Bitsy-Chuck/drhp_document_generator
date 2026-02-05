@@ -221,7 +221,7 @@ class TestFactExtractorEdgeCases:
             "facts": [
                 {
                     "fact_id": "F001",
-                    # Missing: category, value_type, confidence, location, unit
+                    # Missing: value_type, confidence, location, unit
                     "key": "test_key",
                     "value": "test_value",
                     "raw_text": "test raw text",
@@ -237,7 +237,6 @@ class TestFactExtractorEdgeCases:
 
         assert len(extraction.facts) == 1
         fact = extraction.facts[0]
-        assert fact.category == "unknown"  # default
         assert fact.value_type == "text"  # default
         assert fact.confidence == 1.0  # default
         assert fact.unit is None
@@ -248,7 +247,6 @@ class TestFactExtractorEdgeCases:
             "facts": [
                 {
                     "fact_id": "F001",
-                    "category": "test",
                     "key": "test_key",
                     "value": 100,
                     "value_type": "integer",
@@ -342,7 +340,6 @@ class TestFactStoreSerialization:
 
         fact = ExtractedFact(
             fact_id="F001",
-            category="capital_structure",
             key="authorized_shares",
             value=30000,
             value_type="integer",

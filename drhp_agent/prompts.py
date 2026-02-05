@@ -12,7 +12,6 @@ FACT_SCHEMA = """
   "facts": [
     {
       "fact_id": "string - unique identifier, e.g., F001",
-      "category": "string - one of: company_info, capital_structure, allotment, allottee, financial, date, signatory",
       "key": "string - normalized field name, e.g., authorized_share_capital",
       "value": "any - the extracted value (string, number, or structured object)",
       "value_type": "string - one of: amount, integer, percentage, date, text, entity, table_row",
@@ -207,15 +206,23 @@ Check for inconsistencies and return validation results as JSON."""
 # ELABORATION PROMPT (Hybrid Template System)
 # =============================================================================
 
-ELABORATION_SYSTEM_PROMPT = """You are a DRHP drafting assistant. Generate detailed prose for a section of a Draft Red Herring Prospectus.
+ELABORATION_SYSTEM_PROMPT = """You are a DRHP drafting assistant. Generate content for ONE specific section of a Draft Red Herring Prospectus.
 
 ## Task
-Generate rich, detailed markdown content that incorporates ALL relevant facts provided.
+You will receive ALL extracted facts from the source documents, but you must ONLY use the facts that are directly relevant to this block's Instructions. Ignore facts that belong to other sections.
+
+## Selecting Relevant Facts
+Use the block's Instructions and Template Context to determine which facts are in-scope:
+- The Instructions tell you exactly what content to generate (e.g., a table of allotments, a table of allottees)
+- The Template Context shows the surrounding document text so you can match the expected tone and scope
+- Facts whose key, value, or location do NOT relate to the Instructions should be skipped entirely
+
+## Important Context
+This block is ONE part of a larger DRHP document. Other blocks cover other topics separately. Do NOT generate content that belongs in other sections — stay focused on exactly what the Instructions ask for.
 
 ## Style Requirements
 - Use formal legal disclosure language (not marketing/promotional)
-- Do NOT summarize - include all details from the facts
-- Use tables where appropriate (especially for lists of allottees, share allotments)
+- Follow the format specified in the Instructions (table, prose, or both)
 - Every significant fact must have a source citation [Source: filename]
 - Follow Indian DRHP conventions
 
@@ -232,28 +239,32 @@ Return JSON:
 }}
 
 ## Rules
-1. Include ALL facts provided - do not selectively omit
-2. For tabular data (allottees, shares), create proper markdown tables
-3. Use proper Indian number formatting (lakhs, crores)
-4. Dates in "DD Month YYYY" format
-5. If facts appear contradictory, note the discrepancy but include all
-6. Generate complete, standalone prose - not bullet points
+1. ONLY use facts relevant to this block's Instructions — skip unrelated facts
+2. Do NOT add sub-sections, narratives, or details outside this block's scope (e.g., no compliance paragraphs in an allottee table, no allottee details in an allotment history table)
+3. For tabular data, create proper markdown tables
+4. Use proper Indian number formatting (lakhs, crores)
+5. Dates in "DD Month YYYY" format
+6. If relevant facts appear contradictory, note the discrepancy but include all relevant ones
 """
 
-ELABORATION_USER_PROMPT = """Generate detailed content for this DRHP section block.
+ELABORATION_USER_PROMPT = """Generate content for this DRHP section block.
 
 ## Block Information
 - Block ID: {block_id}
 - Instructions: {hint}
-- Fact Category Filter: {fact_category}
 
 ## Template Context (surrounding text)
 {template_context}
 
-## Relevant Facts
+## Sibling Blocks (covered by OTHER sections — do NOT duplicate)
+- allotment_history: table of share allotments (dates, number of shares, face value, issue price)
+- allottee_details: table of allottees (names, addresses, nationality, shares, amounts paid)
+- shareholding_pattern: table of current shareholders with percentage holdings
+
+## Available Facts (use ONLY those relevant to the Instructions above)
 {facts_json}
 
-Generate detailed markdown content incorporating ALL the facts above.
+Generate content covering ONLY what the Instructions ask for. Skip facts that belong to the sibling blocks listed above.
 Return JSON with generated_markdown, source_facts, source_files, and confidence."""
 
 ELABORATION_SCHEMA = """

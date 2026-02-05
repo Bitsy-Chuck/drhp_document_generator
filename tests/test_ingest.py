@@ -121,7 +121,6 @@ class TestFactExtractor:
             "facts": [
                 {
                     "fact_id": "F001",
-                    "category": "company_info",
                     "key": "company_name",
                     "value": "Test Corp",
                     "value_type": "text",
@@ -136,7 +135,6 @@ class TestFactExtractor:
                 },
                 {
                     "fact_id": "F002",
-                    "category": "capital_structure",
                     "key": "authorized_shares",
                     "value": 30000,
                     "value_type": "integer",
@@ -180,7 +178,6 @@ class TestFactExtractor:
 
         fact1 = extraction.facts[0]
         assert fact1.fact_id == "F001"
-        assert fact1.category == "company_info"
         assert fact1.key == "company_name"
         assert fact1.value == "Test Corp"
         assert fact1.doc_id == "DOC_001"

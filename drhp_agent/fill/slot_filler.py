@@ -1,14 +1,18 @@
 """LLM-based slot filling.
 
 Tasks 6.1-6.5: Fill template slots using extracted facts via LLM.
+Tasks 16.2: Integrate with retriever module.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from drhp_agent.core.dtos import (
     FactStore,
@@ -16,6 +20,7 @@ from drhp_agent.core.dtos import (
     SlotFillResult,
 )
 from drhp_agent.llm.client import LLMClient
+from drhp_agent.retrieve.fact_retriever import FactRetriever, AllFactsRetriever
 
 
 @dataclass
@@ -76,13 +81,19 @@ class FilledSlots:
 class SlotFiller:
     """Fills template slots using LLM and extracted facts."""
 
-    def __init__(self, llm_client: LLMClient):
-        """Initialize with LLM client.
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        retriever: FactRetriever | None = None,
+    ):
+        """Initialize with LLM client and optional retriever.
 
         Args:
             llm_client: Configured LLM client
+            retriever: Optional fact retriever (defaults to AllFactsRetriever)
         """
         self.llm = llm_client
+        self.retriever = retriever or AllFactsRetriever()
 
     def fill_slot(
         self,
@@ -91,6 +102,8 @@ class SlotFiller:
     ) -> SlotFillResult:
         """Fill a single slot using extracted facts.
 
+        Uses the configured retriever to select facts for the LLM.
+
         Args:
             request: Slot fill request with slot details
             fact_store: Store of extracted facts
@@ -98,8 +111,10 @@ class SlotFiller:
         Returns:
             SlotFillResult with filled value or status
         """
-        # Serialize relevant facts to JSON
-        facts_json = self._serialize_facts(fact_store)
+        # Retrieve relevant facts using the configured retriever
+        query = request.slot_hint or request.slot_id
+        facts = self.retriever.retrieve(fact_store, query, request.slot_context)
+        facts_json = json.dumps(facts, indent=2, ensure_ascii=False)
 
         try:
             result = self.llm.fill_slot(
@@ -110,7 +125,7 @@ class SlotFiller:
                 facts_json=facts_json,
             )
 
-            return SlotFillResult(
+            fill_result = SlotFillResult(
                 slot_id=result.get("slot_id", request.slot_id),
                 status=result.get("status", "missing"),
                 value=result.get("value"),
@@ -120,8 +135,12 @@ class SlotFiller:
                 confidence=float(result.get("confidence", 0.0)),
                 reason=result.get("reason"),
             )
+            logger.info("Slot %s: status=%s confidence=%.2f",
+                        request.slot_id, fill_result.status, fill_result.confidence)
+            return fill_result
 
         except Exception as e:
+            logger.error("Slot %s: fill error — %s", request.slot_id, e)
             return SlotFillResult(
                 slot_id=request.slot_id,
                 status="missing",
@@ -174,7 +193,10 @@ class SlotFiller:
         )
 
     def _serialize_facts(self, fact_store: FactStore) -> str:
-        """Serialize facts to JSON for LLM prompt.
+        """Serialize all facts to JSON for LLM prompt.
+
+        Deprecated: Use retriever.retrieve() directly for more control.
+        This method is kept for backward compatibility.
 
         Args:
             fact_store: Store of extracted facts
@@ -182,24 +204,6 @@ class SlotFiller:
         Returns:
             JSON string of all facts
         """
-        facts = []
-        for fact in fact_store.all_facts():
-            facts.append({
-                "fact_id": fact.fact_id,
-                "category": fact.category,
-                "key": fact.key,
-                "value": fact.value,
-                "value_type": fact.value_type,
-                "raw_text": fact.raw_text,
-                "unit": fact.unit,
-                "confidence": fact.confidence,
-                "doc_id": fact.doc_id,
-                "location": {
-                    "section": fact.location.section,
-                    "table": fact.location.table,
-                    "row": fact.location.row,
-                    "column": fact.location.column,
-                },
-            })
-
+        # Use retriever's _facts_to_dicts method for consistent serialization
+        facts = self.retriever._facts_to_dicts(fact_store)
         return json.dumps(facts, indent=2, ensure_ascii=False)

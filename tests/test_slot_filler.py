@@ -87,7 +87,6 @@ class TestSlotFiller:
     def sample_fact_store(self):
         fact = ExtractedFact(
             fact_id="F001",
-            category="company_info",
             key="company_name",
             value="Test Corp",
             value_type="text",
@@ -209,25 +208,25 @@ class TestSlotFillerBusinessLogic:
         """Fact store with multiple facts for matching scenarios."""
         facts = [
             ExtractedFact(
-                fact_id="F001", category="capital_structure", key="authorized_shares",
+                fact_id="F001", key="authorized_shares",
                 value=30000, value_type="integer", raw_text="30,000 equity shares",
                 location=FactLocation(section="Section 7", table="Capital"),
                 doc_id="DOC_001", confidence=0.95,
             ),
             ExtractedFact(
-                fact_id="F002", category="capital_structure", key="authorized_shares",
+                fact_id="F002", key="authorized_shares",
                 value=35000, value_type="integer", raw_text="35,000 shares authorized",
                 location=FactLocation(section="Header"),
                 doc_id="DOC_002", confidence=0.85,
             ),
             ExtractedFact(
-                fact_id="F003", category="company_info", key="company_name",
+                fact_id="F003", key="company_name",
                 value="Test Corp Private Limited", value_type="text",
                 raw_text="Test Corp Private Limited",
                 location=FactLocation(), doc_id="DOC_001", confidence=0.99,
             ),
             ExtractedFact(
-                fact_id="F004", category="allotment", key="allotment_date",
+                fact_id="F004", key="allotment_date",
                 value="2019-05-15", value_type="date", raw_text="15 May 2019",
                 location=FactLocation(section="Resolution"),
                 doc_id="DOC_001", confidence=0.90,

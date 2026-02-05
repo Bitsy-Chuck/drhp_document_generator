@@ -25,7 +25,7 @@ class TestFactSchema:
         # Should contain key fields
         assert '"facts"' in FACT_SCHEMA
         assert '"fact_id"' in FACT_SCHEMA
-        assert '"category"' in FACT_SCHEMA
+        assert '"key"' in FACT_SCHEMA
         assert '"value"' in FACT_SCHEMA
         assert '"confidence"' in FACT_SCHEMA
 

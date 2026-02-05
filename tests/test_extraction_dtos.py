@@ -47,7 +47,6 @@ class TestExtractedFact:
         loc = FactLocation()
         fact = ExtractedFact(
             fact_id="F001",
-            category="capital_structure",
             key="authorized_shares",
             value=30000,
             value_type="integer",
@@ -55,7 +54,7 @@ class TestExtractedFact:
             location=loc,
         )
         assert fact.fact_id == "F001"
-        assert fact.category == "capital_structure"
+        assert fact.key == "authorized_shares"
         assert fact.value == 30000
         assert fact.confidence == 1.0
         assert fact.unit is None
@@ -64,11 +63,10 @@ class TestExtractedFact:
         loc = FactLocation(section="Section 7", table="Table 1")
         fact = ExtractedFact(
             fact_id="F002",
-            category="financial",
             key="total_amount",
             value="75,45,600",
             value_type="amount",
-            raw_text="Total: ₹75,45,600",
+            raw_text="Total: Rs.75,45,600",
             location=loc,
             unit="INR",
             confidence=0.95,
@@ -95,7 +93,6 @@ class TestDocumentExtraction:
     def test_extraction_with_facts(self):
         fact = ExtractedFact(
             fact_id="F001",
-            category="company_info",
             key="company_name",
             value="Test Corp",
             value_type="text",
@@ -132,7 +129,6 @@ class TestFactStore:
         """Create a sample FactStore with test data."""
         fact1 = ExtractedFact(
             fact_id="F001",
-            category="capital_structure",
             key="authorized_shares",
             value=30000,
             value_type="integer",
@@ -142,7 +138,6 @@ class TestFactStore:
         )
         fact2 = ExtractedFact(
             fact_id="F002",
-            category="company_info",
             key="company_name",
             value="Test Corp",
             value_type="text",
@@ -152,7 +147,6 @@ class TestFactStore:
         )
         fact3 = ExtractedFact(
             fact_id="F003",
-            category="capital_structure",
             key="issued_shares",
             value=19321,
             value_type="integer",
@@ -180,11 +174,6 @@ class TestFactStore:
         facts = sample_store.all_facts()
         assert len(facts) == 3
 
-    def test_facts_by_category(self, sample_store):
-        cap_facts = sample_store.facts_by_category("capital_structure")
-        assert len(cap_facts) == 2
-        assert all(f.category == "capital_structure" for f in cap_facts)
-
     def test_facts_by_key(self, sample_store):
         facts = sample_store.facts_by_key("authorized_shares")
         assert len(facts) == 1
@@ -206,7 +195,6 @@ class TestFactStore:
     def test_empty_store(self):
         store = FactStore()
         assert store.all_facts() == []
-        assert store.facts_by_category("any") == []
 
 
 class TestSlotFillRequest:

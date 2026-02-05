@@ -6,9 +6,12 @@ Tasks 4.5-4.10: Extract facts from documents using LLM.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from drhp_agent.core.dtos import (
     DocumentExtraction,
@@ -46,10 +49,12 @@ class FactExtractor:
         Returns:
             DocumentExtraction with all extracted facts
         """
+        logger.info("Extracting facts from %s (%s)", file_path.name, doc_id)
         try:
             result = self.llm.extract_facts(content, file_path.name)
             facts = self._parse_facts(result, doc_id)
 
+            logger.info("Extracted %d facts from %s", len(facts), file_path.name)
             return DocumentExtraction(
                 doc_id=doc_id,
                 file_path=str(file_path),
@@ -60,6 +65,7 @@ class FactExtractor:
             )
 
         except Exception as e:
+            logger.error("Extraction failed for %s: %s", file_path.name, e)
             return DocumentExtraction(
                 doc_id=doc_id,
                 file_path=str(file_path),
@@ -95,7 +101,6 @@ class FactExtractor:
 
             fact = ExtractedFact(
                 fact_id=fact_data.get("fact_id", f"F_{len(facts)+1:03d}"),
-                category=fact_data.get("category", "unknown"),
                 key=fact_data.get("key", "unknown"),
                 value=fact_data.get("value"),
                 value_type=fact_data.get("value_type", "text"),
@@ -152,7 +157,6 @@ class FactExtractor:
                     "facts": [
                         {
                             "fact_id": f.fact_id,
-                            "category": f.category,
                             "key": f.key,
                             "value": f.value,
                             "value_type": f.value_type,

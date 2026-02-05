@@ -39,7 +39,7 @@ class TestPrintSummary:
 
         # Create a successful result
         fact = ExtractedFact(
-            fact_id="F001", category="test", key="test",
+            fact_id="F001", key="test",
             value="val", value_type="text", raw_text="val",
             location=FactLocation(), doc_id="DOC_001",
         )
@@ -205,7 +205,7 @@ class TestCLIExecution:
         mock_llm_responses = {
             "extract": {
                 "facts": [{
-                    "fact_id": "F001", "category": "test", "key": "company_name",
+                    "fact_id": "F001", "key": "company_name",
                     "value": "Test Corp", "value_type": "text", "raw_text": "Test Corp",
                     "confidence": 0.95, "location": {},
                 }],

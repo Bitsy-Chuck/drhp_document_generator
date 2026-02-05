@@ -27,7 +27,6 @@ class ExtractedFact:
     """A single fact extracted from a document."""
 
     fact_id: str
-    category: str  # company_info, capital_structure, allotment, allottee, financial, date, signatory
     key: str  # Normalized field name
     value: Any
     value_type: str  # amount, integer, percentage, date, text, entity, table_row
@@ -66,10 +65,6 @@ class FactStore:
                     fact.doc_id = extraction.doc_id
                 facts.append(fact)
         return facts
-
-    def facts_by_category(self, category: str) -> list[ExtractedFact]:
-        """Return facts filtered by category."""
-        return [f for f in self.all_facts() if f.category == category]
 
     def facts_by_key(self, key: str) -> list[ExtractedFact]:
         """Return facts filtered by key."""

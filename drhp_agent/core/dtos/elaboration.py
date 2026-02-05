@@ -14,15 +14,13 @@ class ElaborationBlock:
     """An elaboration block parsed from the template.
 
     Elaboration blocks use the syntax: {{elaborate:block_id:hint}}
-    or optionally: {{elaborate:block_id:category:hint}}
 
-    They instruct the LLM to generate prose from ALL relevant facts
-    in the specified category, not just fill a single value.
+    They instruct the LLM to generate prose from ALL relevant facts,
+    not just fill a single value. The LLM semantically matches facts to the hint.
     """
 
     block_id: str
     hint: str  # Instructions for what to elaborate on
-    fact_category: str | None = None  # Optional filter: allotment, capital_structure, etc.
     raw_marker: str = ""  # The original marker text
     line_number: int = 0  # Line in template where block appears
     context: str = ""  # Surrounding template text for context
@@ -33,12 +31,12 @@ class ElaborationRequest:
     """Request to elaborate a section using facts.
 
     Sent to LLM to generate rich prose from multiple facts.
+    All facts are passed to the LLM which does semantic matching.
     """
 
     block_id: str
     hint: str  # What to elaborate on
-    fact_category: str | None = None  # Filter facts by category
-    relevant_facts: list[dict[str, Any]] = field(default_factory=list)  # Filtered facts
+    relevant_facts: list[dict[str, Any]] = field(default_factory=list)  # All facts
     template_context: str = ""  # Surrounding template for tone matching
 
 

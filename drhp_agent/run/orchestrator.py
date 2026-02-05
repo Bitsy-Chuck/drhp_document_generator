@@ -7,10 +7,13 @@ Task 13.6: Add elaboration stage for hybrid template system.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 from drhp_agent.core.dtos import FactStore, PipelineConfig, RunManifest, StageStatus
 from drhp_agent.fill.slot_filler import FilledSlots, SlotFiller
@@ -99,6 +102,7 @@ class PipelineOrchestrator:
         try:
             # Stage 1: Load documents
             self.progress("ingest", "Loading documents...")
+            logger.info("Stage ingest: started")
             stage = StageStatus(stage_name="ingest", status="running", started_at=datetime.now())
 
             loader = DocumentLoader(self.config.supporting_docs)
@@ -110,9 +114,12 @@ class PipelineOrchestrator:
             stage.status = "completed"
             stage.completed_at = datetime.now()
             stages.append(stage)
+            logger.info("Stage ingest: completed in %.1fs — %d documents loaded",
+                        (stage.completed_at - stage.started_at).total_seconds(), len(documents))
 
             # Stage 2: Extract facts
             self.progress("extract", "Extracting facts from documents...")
+            logger.info("Stage extract: started")
             stage = StageStatus(stage_name="extract", status="running", started_at=datetime.now())
 
             extractor = FactExtractor(self.llm_client)
@@ -126,9 +133,12 @@ class PipelineOrchestrator:
             stage.completed_at = datetime.now()
             stage.artifacts = [str(fact_store_path)]
             stages.append(stage)
+            logger.info("Stage extract: completed in %.1fs — %d facts extracted",
+                        (stage.completed_at - stage.started_at).total_seconds(), total_facts)
 
             # Stage 3: Parse template
             self.progress("template", "Parsing template...")
+            logger.info("Stage template: started")
             stage = StageStatus(stage_name="template", status="running", started_at=datetime.now())
 
             parser = TemplateParser(self.config.drhp_md)
@@ -141,9 +151,12 @@ class PipelineOrchestrator:
             stage.completed_at = datetime.now()
             stage.artifacts = [str(template_path)]
             stages.append(stage)
+            logger.info("Stage template: completed in %.1fs — %d slots found",
+                        (stage.completed_at - stage.started_at).total_seconds(), len(template.slots))
 
             # Stage 4: Fill slots
             self.progress("fill", "Filling slots...")
+            logger.info("Stage fill: started")
             stage = StageStatus(stage_name="fill", status="running", started_at=datetime.now())
 
             filler = SlotFiller(self.llm_client)
@@ -166,11 +179,15 @@ class PipelineOrchestrator:
             stage.completed_at = datetime.now()
             stage.artifacts = [str(filled_slots_path)]
             stages.append(stage)
+            logger.info("Stage fill: completed in %.1fs — filled=%d missing=%d conflicts=%d",
+                        (stage.completed_at - stage.started_at).total_seconds(),
+                        filled_slots.filled_count, filled_slots.missing_count, filled_slots.conflict_count)
 
             # Stage 5: Elaborate (if template has elaboration blocks)
             elaborations = None
             if template.elaboration_blocks:
                 self.progress("elaborate", "Elaborating sections...")
+                logger.info("Stage elaborate: started")
                 stage = StageStatus(stage_name="elaborate", status="running", started_at=datetime.now())
 
                 elaborator = Elaborator(self.llm_client)
@@ -196,11 +213,16 @@ class PipelineOrchestrator:
                 stage.completed_at = datetime.now()
                 stage.artifacts = [str(elaborations_path)]
                 stages.append(stage)
+                logger.info("Stage elaborate: completed in %.1fs — generated=%d empty=%d errors=%d",
+                            (stage.completed_at - stage.started_at).total_seconds(),
+                            elaborations.generated_count, elaborations.empty_count, elaborations.error_count)
             else:
                 self.progress("elaborate", "No elaboration blocks in template, skipping...")
+                logger.info("Stage elaborate: skipped (no elaboration blocks)")
 
             # Stage 6: Validate
             self.progress("validate", "Validating facts...")
+            logger.info("Stage validate: started")
             stage = StageStatus(stage_name="validate", status="running", started_at=datetime.now())
 
             validator = FactValidator(self.llm_client)
@@ -217,9 +239,13 @@ class PipelineOrchestrator:
             stage.completed_at = datetime.now()
             stage.artifacts = [str(validation_path)]
             stages.append(stage)
+            logger.info("Stage validate: completed in %.1fs — valid=%s issues=%d",
+                        (stage.completed_at - stage.started_at).total_seconds(),
+                        validation.is_valid, len(validation.issues))
 
             # Stage 7: Render
             self.progress("render", "Rendering section...")
+            logger.info("Stage render: started")
             stage = StageStatus(stage_name="render", status="running", started_at=datetime.now())
 
             renderer = SectionRenderer(self.llm_client)
@@ -243,6 +269,9 @@ class PipelineOrchestrator:
             stage.completed_at = datetime.now()
             stage.artifacts = [str(section_path), str(annotations_path), str(flags_path)]
             stages.append(stage)
+            logger.info("Stage render: completed in %.1fs — %d review flags",
+                        (stage.completed_at - stage.started_at).total_seconds(),
+                        len(render_result.review_flags))
 
             # Complete manifest
             manifest.stages = stages
@@ -260,6 +289,9 @@ class PipelineOrchestrator:
             manifest_path = self.out_dir / "manifest.json"
             self._save_manifest(manifest, manifest_path)
 
+            total_time = (manifest.completed_at - start_time).total_seconds()
+            logger.info("Pipeline completed successfully in %.1fs", total_time)
+
             return PipelineResult(
                 success=True,
                 manifest=manifest,
@@ -272,6 +304,7 @@ class PipelineOrchestrator:
             )
 
         except Exception as e:
+            logger.error("Pipeline failed: %s", e, exc_info=True)
             manifest.stages = stages
             manifest.completed_at = datetime.now()
             manifest.status = "failed"

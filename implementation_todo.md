@@ -314,3 +314,60 @@ The authorized capital is ₹{{amount:authorized_capital}}.
 - Additional section templates (Objects, Risk Factors, etc.)
 - Elaboration with cross-section context
 - User feedback loop for elaboration quality
+
+---
+
+## 15) Simplify Fact Matching - Remove Categories (COMPLETED)
+
+### 15.1 Remove category from extraction
+- [x] 15.1.1 Remove `category` field from `FACT_SCHEMA` in prompts.py
+- [x] 15.1.2 Update `EXTRACTION_SYSTEM_PROMPT` to not request category assignment
+- [x] 15.1.3 Remove `category` field from `ExtractedFact` DTO
+- [x] 15.1.4 Update `DocumentExtraction` parsing to not expect category
+- [x] 15.1.5 Update extraction tests
+
+### 15.2 Remove category filtering
+- [x] 15.2.1 Remove `facts_by_category()` method from `FactStore`
+- [x] 15.2.2 Update `FactFilter` in elaborator to not filter by category
+- [x] 15.2.3 Update elaboration to pass full fact_store instead of filtered subset
+- [x] 15.2.4 Remove `fact_category` field from `ElaborationBlock` DTO
+- [x] 15.2.5 Update template parser to not extract category from elaborate markers
+
+### 15.3 Update slot filling
+- [x] 15.3.1 Ensure slot filler passes full fact_store (already does this)
+- [x] 15.3.2 Update slot fill prompt to emphasize semantic matching from all facts
+
+### 15.4 Cleanup and testing
+- [x] 15.4.1 Remove all `category` references from test files
+- [x] 15.4.2 Update `fact_store.json` sample output (no category field)
+- [x] 15.4.3 Run full test suite to verify nothing breaks (308 tests passing)
+- [x] 15.4.4 Run end-to-end pipeline to verify output quality unchanged
+
+---
+
+## 16) Extract Fact Retriever Module (COMPLETED)
+
+### 16.1 Create retriever module
+- [x] 16.1.1 Create `retrieve/fact_retriever.py` with `FactRetriever` base class
+- [x] 16.1.2 Implement `AllFactsRetriever` (pass all facts to LLM)
+- [x] 16.1.3 Add `retrieve(fact_store, query, context) -> list[dict]` interface
+
+### 16.2 Integrate with slot filler
+- [x] 16.2.1 Update `SlotFiller.__init__` to accept optional `retriever` param
+- [x] 16.2.2 Replace `_serialize_facts()` with `retriever.retrieve()`
+- [x] 16.2.3 Default to `AllFactsRetriever` if none provided
+
+### 16.3 Integrate with elaborator
+- [x] 16.3.1 Update `Elaborator.__init__` to accept optional `retriever` param
+- [x] 16.3.2 Replace `FactFilter` usage with `retriever.retrieve()`
+- [x] 16.3.3 Remove `FactFilter` class entirely
+
+### 16.4 Add keyword retriever (for scale)
+- [x] 16.4.1 Implement `KeywordRetriever` for fact stores > 200 facts
+- [x] 16.4.2 Extract keywords from query/hint
+- [x] 16.4.3 Fallback to all facts if no keyword matches
+
+### 16.5 Testing
+- [x] 16.5.1 Unit tests for `AllFactsRetriever`
+- [x] 16.5.2 Unit tests for `KeywordRetriever`
+- [x] 16.5.3 Integration test: pipeline with custom retriever

@@ -6,6 +6,7 @@ Tasks 3.1-3.5: LLM provider abstraction, API integration, retry logic.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
@@ -13,6 +14,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -71,8 +74,12 @@ class LLMClient:
         temp = temperature if temperature is not None else self.config.temperature
         tokens = max_tokens if max_tokens is not None else self.config.max_tokens
 
+        prompt_len = len(system_prompt) + len(user_prompt)
+        logger.debug("LLM request: model=%s prompt_len=%d temperature=%s", self.config.model, prompt_len, temp)
+
         last_error = None
         for attempt in range(self.config.max_retries):
+            t0 = time.time()
             try:
                 response = self.client.messages.create(
                     model=self.config.model,
@@ -81,12 +88,17 @@ class LLMClient:
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}],
                 )
-                return response.content[0].text
+                elapsed = time.time() - t0
+                result_text = response.content[0].text
+                logger.debug("LLM response: len=%d time=%.1fs", len(result_text), elapsed)
+                return result_text
 
             except anthropic.RateLimitError as e:
                 last_error = e
                 if attempt < self.config.max_retries - 1:
                     delay = self.config.retry_delay * (2**attempt)
+                    logger.warning("Rate limited, retrying in %.1fs (attempt %d/%d)",
+                                   delay, attempt + 1, self.config.max_retries)
                     time.sleep(delay)
                 continue
 
@@ -95,10 +107,14 @@ class LLMClient:
                     last_error = e
                     if attempt < self.config.max_retries - 1:
                         delay = self.config.retry_delay * (2**attempt)
+                        logger.warning("API error %d, retrying in %.1fs (attempt %d/%d)",
+                                       e.status_code, delay, attempt + 1, self.config.max_retries)
                         time.sleep(delay)
                     continue
+                logger.error("API error: %s", e)
                 raise
 
+        logger.error("All %d retries exhausted: %s", self.config.max_retries, last_error)
         raise last_error  # type: ignore
 
     def complete_json(
@@ -270,18 +286,19 @@ class LLMClient:
         self,
         block_id: str,
         hint: str,
-        fact_category: str | None,
         template_context: str,
         facts_json: str,
     ) -> dict[str, Any]:
         """Generate elaborate prose for a template block.
 
+        All facts are passed to the LLM which does semantic matching
+        based on the hint to generate relevant content.
+
         Args:
             block_id: ID of the elaboration block
             hint: Instructions for what to elaborate on
-            fact_category: Optional category filter for facts
             template_context: Surrounding template text for tone matching
-            facts_json: JSON string of relevant facts
+            facts_json: JSON string of all facts
 
         Returns:
             Elaboration result with generated markdown and sources
@@ -294,7 +311,6 @@ class LLMClient:
         user = ELABORATION_USER_PROMPT.format(
             block_id=block_id,
             hint=hint or "Generate detailed content",
-            fact_category=fact_category or "all",
             template_context=template_context or "No context provided",
             facts_json=facts_json,
         )

@@ -80,7 +80,6 @@ class TestFactValidator:
         facts = [
             ExtractedFact(
                 fact_id="F001",
-                category="capital_structure",
                 key="authorized_shares",
                 value=30000,
                 value_type="integer",
@@ -90,7 +89,6 @@ class TestFactValidator:
             ),
             ExtractedFact(
                 fact_id="F002",
-                category="capital_structure",
                 key="issued_shares",
                 value=19321,
                 value_type="integer",
@@ -130,12 +128,12 @@ class TestFactValidator:
         }
         # Create fact store with conflicting values
         fact1 = ExtractedFact(
-            fact_id="F001", category="capital", key="authorized_shares",
+            fact_id="F001", key="authorized_shares",
             value=30000, value_type="integer", raw_text="30,000",
             location=FactLocation(), doc_id="DOC_001",
         )
         fact2 = ExtractedFact(
-            fact_id="F003", category="capital", key="authorized_shares",
+            fact_id="F003", key="authorized_shares",
             value=35000, value_type="integer", raw_text="35,000",
             location=FactLocation(), doc_id="DOC_002",
         )
@@ -294,6 +292,6 @@ class TestFactValidator:
 
         assert len(facts) == 2
         assert facts[0]["fact_id"] == "F001"
-        assert facts[0]["category"] == "capital_structure"
+        assert facts[0]["key"] == "authorized_shares"
         assert facts[0]["value"] == 30000
         assert facts[0]["doc_id"] == "DOC_001"

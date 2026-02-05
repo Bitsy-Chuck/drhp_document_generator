@@ -317,3 +317,60 @@ Just plain markdown content.
         result = parser.parse()
 
         assert result.slots[0].raw_marker == "{{integer:shares:Number of shares}}"
+
+    def test_slot_context_includes_surrounding_lines(self, tmp_path):
+        """Slot context should include text from lines above/below, not just the same line."""
+        content = """## Section Heading
+
+The company was incorporated on {{date:inc_date:Incorporation date}} with capital.
+
+More text below.
+"""
+        path = tmp_path / "cross_line.md"
+        path.write_text(content)
+
+        parser = TemplateParser(path)
+        result = parser.parse()
+
+        slot = result.slots[0]
+        assert "Section Heading" in slot.context
+        assert "incorporated on" in slot.context
+
+    def test_elaborate_block_context_includes_heading(self, tmp_path):
+        """Elaborate block context should include the section heading above it."""
+        content = """## History of Share Capital
+
+The following table sets forth the history:
+
+{{elaborate:allotment_history:Generate a table of allotments}}
+
+## Next Section
+"""
+        path = tmp_path / "elaborate_ctx.md"
+        path.write_text(content)
+
+        parser = TemplateParser(path)
+        result = parser.parse()
+
+        block = result.elaboration_blocks[0]
+        assert "History of Share Capital" in block.context
+        assert "following table" in block.context
+
+    def test_elaborate_block_context_not_just_marker(self, tmp_path):
+        """Elaborate block on its own line should still get cross-line context."""
+        content = """Some intro text above.
+
+{{elaborate:details:Generate details}}
+
+Some text below.
+"""
+        path = tmp_path / "elaborate_alone.md"
+        path.write_text(content)
+
+        parser = TemplateParser(path)
+        result = parser.parse()
+
+        block = result.elaboration_blocks[0]
+        # Context should contain text from other lines, not just the marker
+        assert "intro text above" in block.context
+        assert "text below" in block.context

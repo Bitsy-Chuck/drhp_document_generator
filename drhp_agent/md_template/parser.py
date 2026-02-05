@@ -53,29 +53,22 @@ class ParsedTemplate:
     ) -> list[ElaborationRequest]:
         """Convert elaboration blocks to ElaborationRequest objects.
 
+        All facts are passed to each request. The LLM does semantic
+        matching based on the hint.
+
         Args:
-            facts: Optional list of fact dicts to filter for each block
+            facts: Optional list of all fact dicts
 
         Returns:
             List of ElaborationRequest objects ready for LLM
         """
         requests = []
         for block in self.elaboration_blocks:
-            # Filter facts by category if specified
-            relevant_facts = []
-            if facts:
-                for fact in facts:
-                    if block.fact_category is None:
-                        relevant_facts.append(fact)
-                    elif fact.get("category") == block.fact_category:
-                        relevant_facts.append(fact)
-
             requests.append(
                 ElaborationRequest(
                     block_id=block.block_id,
                     hint=block.hint,
-                    fact_category=block.fact_category,
-                    relevant_facts=relevant_facts,
+                    relevant_facts=list(facts) if facts else [],
                     template_context=block.context,
                 )
             )
@@ -101,7 +94,6 @@ class ParsedTemplate:
                 {
                     "block_id": b.block_id,
                     "hint": b.hint,
-                    "fact_category": b.fact_category,
                     "raw_marker": b.raw_marker,
                     "line_number": b.line_number,
                 }
@@ -123,12 +115,11 @@ class TemplateParser:
         r"\}\}"
     )
 
-    # Matches {{elaborate:block_id:hint}} or {{elaborate:block_id:category:hint}}
+    # Matches {{elaborate:block_id:hint}}
     ELABORATE_PATTERN = re.compile(
         r"\{\{elaborate:"
         r"(?P<block_id>\w+)"  # Required block ID
-        r"(?::(?P<category_or_hint>[^:}]+))?"  # First optional part (category or hint)
-        r"(?::(?P<hint>[^}]+))?"  # Second optional part (hint if category given)
+        r"(?::(?P<hint>[^}]+))?"  # Optional hint
         r"\}\}"
     )
 
@@ -161,6 +152,7 @@ class TemplateParser:
         seen_slots: set[str] = set()
         seen_blocks: set[str] = set()
 
+        line_offset = 0
         for line_num, line in enumerate(lines, start=1):
             # Parse slots
             for match in self.SLOT_PATTERN.finditer(line):
@@ -175,10 +167,11 @@ class TemplateParser:
                 hint = match.group("hint")
                 raw_marker = match.group(0)
 
-                # Extract context around the slot
-                start = max(0, match.start() - self.CONTEXT_WINDOW)
-                end = min(len(line), match.end() + self.CONTEXT_WINDOW)
-                context = line[start:end]
+                # Extract context around the slot (from full content, not just this line)
+                abs_pos = line_offset + match.start()
+                start = max(0, abs_pos - self.CONTEXT_WINDOW)
+                end = min(len(content), abs_pos + len(raw_marker) + self.CONTEXT_WINDOW)
+                context = content[start:end]
 
                 slots.append(
                     ParsedSlot(
@@ -200,37 +193,26 @@ class TemplateParser:
                     continue
                 seen_blocks.add(block_id)
 
-                # Determine category vs hint
-                # Format: {{elaborate:block_id:hint}} or {{elaborate:block_id:category:hint}}
-                category_or_hint = match.group("category_or_hint")
-                hint_part = match.group("hint")
-
-                if hint_part:
-                    # Full format: category_or_hint is category, hint_part is hint
-                    fact_category = category_or_hint
-                    hint = hint_part
-                else:
-                    # Short format: category_or_hint is the hint
-                    fact_category = None
-                    hint = category_or_hint or ""
-
+                hint = match.group("hint") or ""
                 raw_marker = match.group(0)
 
-                # Extract context around the block
-                start = max(0, match.start() - self.CONTEXT_WINDOW)
-                end = min(len(line), match.end() + self.CONTEXT_WINDOW)
-                context = line[start:end]
+                # Extract context around the block (from full content, not just this line)
+                abs_pos = line_offset + match.start()
+                start = max(0, abs_pos - self.CONTEXT_WINDOW)
+                end = min(len(content), abs_pos + len(raw_marker) + self.CONTEXT_WINDOW)
+                context = content[start:end]
 
                 elaboration_blocks.append(
                     ElaborationBlock(
                         block_id=block_id,
                         hint=hint,
-                        fact_category=fact_category,
                         raw_marker=raw_marker,
                         line_number=line_num,
                         context=context,
                     )
                 )
+
+            line_offset += len(line) + 1  # +1 for newline
 
         return ParsedTemplate(
             file_path=str(self.template_path),
