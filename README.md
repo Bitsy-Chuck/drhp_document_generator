@@ -8,8 +8,14 @@ Generate Draft Red Herring Prospectus (DRHP) sections from supporting documents 
 # Set your Anthropic API key
 export ANTHROPIC_API_KEY=your-api-key-here
 
-# Run the pipeline
+# Run the pipeline (module)
 python -m drhp_agent.run \
+  --template templates/capital_structure.md \
+  --evidence supporting_docs/PAS-3/ \
+  --out out/
+
+# Or use the installed CLI entrypoint
+drhp-agent \
   --template templates/capital_structure.md \
   --evidence supporting_docs/PAS-3/ \
   --out out/
@@ -19,12 +25,19 @@ python -m drhp_agent.run \
 
 - Python 3.11+
 - Anthropic API key
+- Anthropic SDK (`anthropic` Python package)
 
 ## Installation
 
 ```bash
-# Install dependencies
+# Install project dependencies
+pip install -e .
+
+# Install Anthropic SDK (required at runtime)
 pip install anthropic
+
+# Optional: dev/test tools
+pip install ".[dev]"
 
 # Run tests
 python -m pytest tests/ -v
@@ -49,6 +62,7 @@ python -m drhp_agent.run \
 | `--evidence` | Yes | Path to supporting documents directory |
 | `--out` | Yes | Output directory for generated files |
 | `--quiet` | No | Suppress progress output |
+| `--log-level` | No | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
 ### Exit Codes
 
@@ -66,10 +80,12 @@ out/
 ├── annotations.jsonl          # Fact-to-source mappings
 ├── review_flags.md            # Items needing human review
 ├── manifest.json              # Run metadata
+├── pipeline.log               # Pipeline logs
 └── intermediate/
     ├── fact_store.json        # All extracted facts
     ├── section_template.json  # Parsed template slots
     ├── filled_slots.json      # Slot fill results
+    ├── elaborations.json      # Elaboration results (if present)
     └── validation.json        # Validation results
 ```
 
@@ -79,8 +95,9 @@ out/
 2. **Fact Extraction**: Sends each document to LLM to extract structured facts
 3. **Template Parsing**: Detects `{{type:slot_name:hint}}` markers in template
 4. **Slot Filling**: Uses LLM to match facts to template slots
-5. **Validation**: Checks fact consistency across documents
-6. **Rendering**: Replaces slots with values, adds citations, flags missing data
+5. **Elaboration**: Generates text for `{{elaborate:block_id:hint}}` blocks (if any)
+6. **Validation**: Checks fact consistency across documents
+7. **Rendering**: Replaces slots/blocks with values, adds citations, flags missing data
 
 ## Template Slot Syntax
 
@@ -93,6 +110,10 @@ Slots use the format `{{type:slot_name:hint}}`:
 - `{{percentage:shareholding_percent:Percentage holding}}`
 
 Simple slots without type default to text: `{{simple_slot}}`
+
+Elaboration blocks use the format `{{elaborate:block_id:hint}}`:
+
+- `{{elaborate:share_capital_summary:Summarize the share capital changes}}`
 
 ## Sample Data
 
