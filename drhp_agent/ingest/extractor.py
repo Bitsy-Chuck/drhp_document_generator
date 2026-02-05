@@ -25,7 +25,7 @@ from drhp_agent.llm.client import LLMClient
 class FactExtractor:
     """Extracts facts from documents using LLM."""
 
-    def __init__(self, llm_client: LLMClient):
+    def     __init__(self, llm_client: LLMClient):
         """Initialize extractor with LLM client.
 
         Args:
